@@ -10,16 +10,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Install Terraform properly
+      # 2️⃣ Setup Terraform
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 1.6.6
 
-      # Set AWS credentials
+      # 3️⃣ Configure AWS credentials
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -27,22 +28,28 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
 
-      # Terraform Init
+      # 4️⃣ Terraform Init
       - name: Terraform Init
         working-directory: ./Terraform
         run: terraform init
 
-      # Terraform Validate
+      # 5️⃣ Terraform Validate
       - name: Terraform Validate
         working-directory: ./Terraform
         run: terraform validate
 
-      # Terraform Plan
+      # 6️⃣ Terraform Plan (pass all required variables)
       - name: Terraform Plan
         working-directory: ./Terraform
-        run: terraform plan -out=tfplan
+        run: |
+          terraform plan \
+            -var="image_tag=latest" \
+            -var="ecr_repo=495456621686.dkr.ecr.ap-south-1.amazonaws.com/khaleel/strapi-app" \
+            -var="key_name=khaleel-aws-key" \
+            -var="instance_type=t3.micro" \
+            -out=tfplan
 
-      # Terraform Apply
+      # 7️⃣ Terraform Apply
       - name: Terraform Apply
         working-directory: ./Terraform
         run: terraform apply -auto-approve tfplan
