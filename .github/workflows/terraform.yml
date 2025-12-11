@@ -58,45 +58,68 @@ jobs:
         id: terraform-output
         working-directory: ./Terraform
         run: |
-          PUBLIC_IP=$(terraform output -raw ec2_public_ip)
+          # ✅ FIX: Extract only IP address from terraform output
+          PUBLIC_IP=$(terraform output -raw ec2_public_ip 2>&1 | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 1)
+          
+          if [ -z "$PUBLIC_IP" ]; then
+            echo "❌ ERROR: Could not extract public IP from terraform output"
+            echo "Terraform output was:"
+            terraform output ec2_public_ip
+            exit 1
+          fi
+          
           echo "public_ip=$PUBLIC_IP" >> $GITHUB_OUTPUT
           echo "EC2 Public IP: $PUBLIC_IP"
 
+      - name: Wait for EC2 initialization
+        run: |
+          echo "Waiting 90 seconds for EC2 to fully initialize..."
+          sleep 90
+
       - name: Verify Deployment
         run: |
-          echo "Waiting for EC2 to initialize (60 seconds)..."
-          sleep 60
+          echo "Verifying Strapi deployment..."
+          echo "Public IP: ${{ steps.terraform-output.outputs.public_ip }}"
           
-          echo "Verifying Strapi deployment at: http://${{ steps.terraform-output.outputs.public_ip }}:1337"
-          
-          MAX_RETRIES=10
+          MAX_RETRIES=12
           RETRY_COUNT=0
           
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
             echo "Attempt $((RETRY_COUNT+1))/$MAX_RETRIES..."
             
-            if curl -s -f http://${{ steps.terraform-output.outputs.public_ip }}:1337/_health > /dev/null 2>&1; then
+            # Try to connect to Strapi
+            if curl -s -f --max-time 30 http://${{ steps.terraform-output.outputs.public_ip }}:1337/_health > /dev/null 2>&1; then
               echo ""
               echo "========================================="
               echo "✅ DEPLOYMENT SUCCESSFUL!"
               echo "========================================="
               echo "🌐 Strapi URL: http://${{ steps.terraform-output.outputs.public_ip }}:1337"
               echo "🔧 Admin Panel: http://${{ steps.terraform-output.outputs.public_ip }}:1337/admin"
-              echo "🖥️ SSH Access: ssh -i khaleel-aws-key.pem ubuntu@${{ steps.terraform-output.outputs.public_ip }}"
+              echo "🖥️ SSH Access: ssh -i Terraform/khaleel-aws-key.pem ubuntu@${{ steps.terraform-output.outputs.public_ip }}"
               echo "========================================="
               exit 0
             fi
             
             RETRY_COUNT=$((RETRY_COUNT+1))
-            sleep 10
+            echo "Not ready yet, waiting 15 seconds..."
+            sleep 15
           done
           
           echo ""
-          echo "❌ Strapi failed to start after $MAX_RETRIES attempts"
+          echo "❌ ERROR: Strapi failed to start after $MAX_RETRIES attempts"
           echo ""
-          echo "TROUBLESHOOTING:"
-          echo "1. SSH into EC2: ssh -i Terraform/khaleel-aws-key.pem ubuntu@${{ steps.terraform-output.outputs.public_ip }}"
-          echo "2. Check Docker: sudo docker ps"
-          echo "3. Check logs: sudo docker logs strapi-app"
-          echo "4. Check user-data logs: tail -f /var/log/cloud-init-output.log"
+          echo "TROUBLESHOOTING STEPS:"
+          echo "1. Check SSH connection:"
+          echo "   ssh -i Terraform/khaleel-aws-key.pem ubuntu@${{ steps.terraform-output.outputs.public_ip }}"
+          echo ""
+          echo "2. Once SSH'd in, run these commands:"
+          echo "   sudo docker ps           # Check if container is running"
+          echo "   sudo docker logs strapi-app  # Check container logs"
+          echo "   tail -f /var/log/cloud-init-output.log  # Check initialization logs"
+          echo ""
+          echo "3. Common issues:"
+          echo "   - Docker not installed properly"
+          echo "   - ECR login failed"
+          echo "   - Strapi container failed to start"
+          echo "   - Security group blocking port 1337"
           exit 1
