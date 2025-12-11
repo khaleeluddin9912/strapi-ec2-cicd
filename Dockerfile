@@ -5,12 +5,14 @@ RUN apk add --no-cache python3 make g++ libc6-compat
 
 WORKDIR /app
 
-COPY package*.json ./
+# Copy package.json and package-lock.json from Strapi folder
+COPY strapi-project/package*.json ./
 
 # Install dependencies
 RUN npm install
 
-COPY . .
+# Copy the rest of Strapi app
+COPY strapi-project/ ./
 
 # Build the Strapi admin panel
 RUN npm run build
