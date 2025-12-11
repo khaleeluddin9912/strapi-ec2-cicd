@@ -4,21 +4,22 @@ resource "aws_key_pair" "strapi_key" {
 }
 
 resource "aws_instance" "strapi_ec2" {
-  ami                         = "ami-02b8269d5e85954ef"
+  ami                         = "ami-02b8269d5e85954ef"  # Your AMI ID
   instance_type               = var.instance_type
   key_name                    = aws_key_pair.strapi_key.key_name
-  security_groups             = [aws_security_group.strapi_sg.name]
-  associate_public_ip_address = true
+  vpc_security_group_ids      = [aws_security_group.strapi_sg.id]
+  associate_public_ip_address = true  # This gives public IP automatically
 
-  iam_instance_profile        = aws_iam_instance_profile.ec2_profile.name
+  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
 
   user_data = templatefile("user-data.sh.tpl", {
-    image_tag = var.image_tag,
-    ecr_repo  = var.ecr_repo
+    image_tag  = var.image_tag,
+    ecr_repo   = var.ecr_repo,
+    aws_region = var.aws_region
   })
 
   tags = {
-    Name = "Strapi-EC2"
+    Name    = "Strapi-EC2"
+    Project = "Strapi-Deployment"
   }
 }
-

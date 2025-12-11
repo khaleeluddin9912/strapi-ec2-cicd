@@ -1,55 +1,102 @@
 name: CD - Terraform Deploy to AWS
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Docker image tag (use "latest" for most recent)'
+        required: true
+        default: 'latest'
+
+env:
+  AWS_REGION: ap-south-1
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
+    
     steps:
-      # 1️⃣ Checkout repo
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 2️⃣ Setup Terraform
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 1.6.6
 
-      # 3️⃣ Configure AWS Credentials
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-south-1
+          aws-region: ${{ env.AWS_REGION }}
 
-      # 4️⃣ Terraform Init
       - name: Terraform Init
         working-directory: ./Terraform
         run: terraform init
 
-      # 5️⃣ Terraform Validate
       - name: Terraform Validate
         working-directory: ./Terraform
         run: terraform validate
 
-      # 6️⃣ Terraform Plan using latest image
       - name: Terraform Plan
         working-directory: ./Terraform
         run: |
           terraform plan \
-            -var="image_tag=latest" \
+            -var="image_tag=${{ github.event.inputs.image_tag }}" \
             -var="ecr_repo=${{ secrets.ECR_REPO }}" \
             -var="key_name=khaleel-aws-key" \
+            -var="aws_region=${{ env.AWS_REGION }}" \
             -var="instance_type=t3.micro" \
             -out=tfplan
 
-      # 7️⃣ Terraform Apply
       - name: Terraform Apply
         working-directory: ./Terraform
         run: terraform apply -auto-approve tfplan
+
+      - name: Get Public IP
+        id: terraform-output
+        working-directory: ./Terraform
+        run: |
+          PUBLIC_IP=$(terraform output -raw ec2_public_ip)
+          echo "public_ip=$PUBLIC_IP" >> $GITHUB_OUTPUT
+          echo "EC2 Public IP: $PUBLIC_IP"
+
+      - name: Verify Deployment
+        run: |
+          echo "Waiting for EC2 to initialize (60 seconds)..."
+          sleep 60
+          
+          echo "Verifying Strapi deployment at: http://${{ steps.terraform-output.outputs.public_ip }}:1337"
+          
+          MAX_RETRIES=10
+          RETRY_COUNT=0
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            echo "Attempt $((RETRY_COUNT+1))/$MAX_RETRIES..."
+            
+            if curl -s -f http://${{ steps.terraform-output.outputs.public_ip }}:1337/_health > /dev/null 2>&1; then
+              echo ""
+              echo "========================================="
+              echo "✅ DEPLOYMENT SUCCESSFUL!"
+              echo "========================================="
+              echo "🌐 Strapi URL: http://${{ steps.terraform-output.outputs.public_ip }}:1337"
+              echo "🔧 Admin Panel: http://${{ steps.terraform-output.outputs.public_ip }}:1337/admin"
+              echo "🖥️ SSH Access: ssh -i khaleel-aws-key.pem ubuntu@${{ steps.terraform-output.outputs.public_ip }}"
+              echo "========================================="
+              exit 0
+            fi
+            
+            RETRY_COUNT=$((RETRY_COUNT+1))
+            sleep 10
+          done
+          
+          echo ""
+          echo "❌ Strapi failed to start after $MAX_RETRIES attempts"
+          echo ""
+          echo "TROUBLESHOOTING:"
+          echo "1. SSH into EC2: ssh -i Terraform/khaleel-aws-key.pem ubuntu@${{ steps.terraform-output.outputs.public_ip }}"
+          echo "2. Check Docker: sudo docker ps"
+          echo "3. Check logs: sudo docker logs strapi-app"
+          echo "4. Check user-data logs: tail -f /var/log/cloud-init-output.log"
+          exit 1

@@ -1,6 +1,7 @@
 variable "key_name" {
   description = "EC2 Key pair name"
-  default = "khaleel-aws-key"
+  type        = string
+  default     = "khaleel-aws-key"
 }
 
 variable "instance_type" {
@@ -12,9 +13,16 @@ variable "instance_type" {
 variable "image_tag" {
   description = "Docker image tag from ECR"
   type        = string
+  default     = "latest"
 }
 
 variable "ecr_repo" {
   description = "ECR repository URL"
   type        = string
+}
+
+variable "aws_region" {
+  description = "AWS region"
+  type        = string
+  default     = "ap-south-1"
 }

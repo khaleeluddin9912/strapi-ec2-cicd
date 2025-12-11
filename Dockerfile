@@ -3,16 +3,12 @@ FROM node:20-alpine
 # Install required OS packages
 RUN apk add --no-cache python3 make g++ libc6-compat
 
+# Create directory and copy
 WORKDIR /app
-
-# Copy only package.json and package-lock.json from Strapi folder
-COPY strapi-project/package*.json ./
+COPY strapi-project/ ./
 
 # Install dependencies
 RUN npm install
-
-# Copy the rest of Strapi app
-COPY strapi-project/ ./
 
 # Build Strapi admin panel
 RUN npm run build
