@@ -1,16 +1,25 @@
-name: CD - Terraform Deploy
+name: Terraform Deploy
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
-  terraform-deploy:
+  terraform:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v3
 
+      # 🔥 Install Terraform (this was missing!)
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.6.6
+
+      # Configure AWS Credentials
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -18,19 +27,14 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
 
-      - name: Install Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.5.7
-
+      # Initialize Terraform
       - name: Terraform Init
-        working-directory: ./Terraform
         run: terraform init
 
-      - name: Terraform Plan
-        working-directory: ./Terraform
-        run: terraform plan -var "image_tag=${{ github.event.inputs.image_tag }}" -out=tfplan
+      # Validate Terraform
+      - name: Terraform Validate
+        run: terraform validate
 
+      # Apply Terraform
       - name: Terraform Apply
-        working-directory: ./Terraform
-        run: terraform apply -auto-approve tfplan
+        run: terraform apply -auto-approve
