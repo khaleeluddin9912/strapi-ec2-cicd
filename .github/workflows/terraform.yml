@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  terraform:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -18,23 +18,14 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
 
-      - name: Get latest image tag from ECR
-        id: get-tag
-        run: |
-          IMAGE_TAG=$(aws ecr describe-images \
-            --repository-name khaleel/starpi-app \
-            --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]' \
-            --output text)
-          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-
       - name: Terraform Init
         run: terraform init
+        working-directory: Terraform
 
       - name: Terraform Plan
-        run: terraform plan -var "image_tag=${{ steps.get-tag.outputs.image_tag }}" -out=tfplan
+        run: terraform plan -var "image_tag=${{ github.run_id }}" -out=tfplan
+        working-directory: Terraform
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
+        working-directory: Terraform
