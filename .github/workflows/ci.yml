@@ -33,6 +33,14 @@ jobs:
         run: |
           docker build -t ${{ secrets.ECR_REPO }}:${{ steps.tag.outputs.image_tag }} .
 
-      - name: Push Docker image to ECR
+      - name: Push Docker image (Version Tag)
         run: |
           docker push ${{ secrets.ECR_REPO }}:${{ steps.tag.outputs.image_tag }}
+
+      - name: Tag image as latest
+        run: |
+          docker tag ${{ secrets.ECR_REPO }}:${{ steps.tag.outputs.image_tag }} ${{ secrets.ECR_REPO }}:latest
+
+      - name: Push latest tag
+        run: |
+          docker push ${{ secrets.ECR_REPO }}:latest

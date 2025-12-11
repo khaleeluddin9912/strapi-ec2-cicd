@@ -1,4 +1,4 @@
-name: Terraform Deploy to AWS
+name: CD - Terraform Deploy to AWS
 
 on:
   push:
@@ -6,11 +6,11 @@ on:
       - main
 
 jobs:
-  terraform:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout repository
+      # 1️⃣ Checkout repo
       - name: Checkout repository
         uses: actions/checkout@v3
 
@@ -20,7 +20,7 @@ jobs:
         with:
           terraform_version: 1.6.6
 
-      # 3️⃣ Configure AWS credentials
+      # 3️⃣ Configure AWS Credentials
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -38,13 +38,13 @@ jobs:
         working-directory: ./Terraform
         run: terraform validate
 
-      # 6️⃣ Terraform Plan (pass all required variables)
+      # 6️⃣ Terraform Plan using latest image
       - name: Terraform Plan
         working-directory: ./Terraform
         run: |
           terraform plan \
             -var="image_tag=latest" \
-            -var="ecr_repo=495456621686.dkr.ecr.ap-south-1.amazonaws.com/khaleel/strapi-app" \
+            -var="ecr_repo=${{ secrets.ECR_REPO }}" \
             -var="key_name=khaleel-aws-key" \
             -var="instance_type=t3.micro" \
             -out=tfplan
