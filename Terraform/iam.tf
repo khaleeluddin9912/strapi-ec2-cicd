@@ -1,6 +1,7 @@
+# iam.tf - CHANGE THE NAME
 resource "aws_iam_role" "ec2_ecr_access" {
-  name = "ec2-ecr-role-strapi"
-
+  name = "ec2-ecr-role-strapi-v2"  # ← CHANGE THIS
+  
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -13,12 +14,8 @@ resource "aws_iam_role" "ec2_ecr_access" {
   })
 }
 
-resource "aws_iam_role_policy_attachment" "ecr_attach" {
-  role       = aws_iam_role.ec2_ecr_access.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
-}
-
+# Also update the instance profile name
 resource "aws_iam_instance_profile" "ec2_profile" {
-  name = "ec2-instance-profile-strapi"
+  name = "ec2-instance-profile-strapi-v2"  # ← CHANGE THIS TOO
   role = aws_iam_role.ec2_ecr_access.name
 }
